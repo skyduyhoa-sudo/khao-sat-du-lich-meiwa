@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: khao-sat-du-lich-meiwa
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATA_DIR
+        value: /var/data
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false
+      - key: GOOGLE_DRIVE_SHARED_URL
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+    disk:
+      name: khao-sat-data
+      mountPath: /var/data
+      sizeGB: 1
