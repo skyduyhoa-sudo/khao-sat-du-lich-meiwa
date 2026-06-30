@@ -669,7 +669,7 @@ def render_shell() -> None:
         st.caption("Google Drive: chưa cấu hình. App hiện vẫn lưu file tổng trong máy và cho tải trực tiếp.")
     drive_url = st.session_state.last_drive_url or drive_settings["shared_url"]
     if drive_url:
-        st.markdown(f"[Mở file tổng trên Google Drive]({drive_url})")
+        st.markdown(f"[MỞ FILE TỔNG TRÊN GOOGLE DRIVE]({drive_url})")
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="card">', unsafe_allow_html=True)

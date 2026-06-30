@@ -46,11 +46,16 @@ App da co san file `render.yaml`, nen co the deploy tren [Render Dashboard](http
    - `GOOGLE_SERVICE_ACCOUNT_JSON`
 7. Deploy
 
+Co the copy nhanh mau bien moi truong tu file:
+
+- `render-env.example.txt`
+
 Luu y:
 
 - `DATA_DIR=/var/data` da duoc cau hinh san de giu `1 file tong duy nhat`
 - Render can `persistent disk` de file tong khong bi mat sau khi restart
 - Neu da cau hinh Google Drive, moi lan luu khao sat app se dong bo them len Drive
+- `GOOGLE_SERVICE_ACCOUNT_JSON` tren Render phai dan thanh 1 dong JSON
 
 Sau khi len online:
 
