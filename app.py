@@ -967,17 +967,34 @@ def render_stat_cards(stats: dict[str, int]) -> None:
         ("Nha Trang", "ニャチャン", stats["nha_trang"]),
         ("Đà Lạt", "ダラット", stats["da_lat"]),
     ]
-    cards_html = "".join(
-        f"""
-        <div class="stat-card">
-            <div class="stat-vn">{vn}</div>
-            <div class="stat-jp">{jp}</div>
-            <div class="stat-value">{value}</div>
-        </div>
-        """
-        for vn, jp, value in items
-    )
-    st.markdown(f'<div class="stats-grid">{cards_html}</div>', unsafe_allow_html=True)
+    top_row = st.columns(3)
+    bottom_row = st.columns(2)
+
+    for column, (vn, jp, value) in zip(top_row, items[:3]):
+        with column:
+            st.markdown(
+                f"""
+                <div class="stat-card">
+                    <div class="stat-vn">{vn}</div>
+                    <div class="stat-jp">{jp}</div>
+                    <div class="stat-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    for column, (vn, jp, value) in zip(bottom_row, items[3:]):
+        with column:
+            st.markdown(
+                f"""
+                <div class="stat-card">
+                    <div class="stat-vn">{vn}</div>
+                    <div class="stat-jp">{jp}</div>
+                    <div class="stat-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 def render_form() -> None:
