@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime
 from io import BytesIO
@@ -694,6 +694,50 @@ def render_hero() -> None:
             color: #6b7280;
             font-size: 0.84rem;
         }}
+        .field-label-vn {{
+            margin: 0.2rem 0 0.1rem;
+            color: #283244;
+            font-size: 0.98rem;
+            font-weight: 700;
+        }}
+        .field-label-jp {{
+            margin: 0 0 0.35rem;
+            color: #7a8294;
+            font-size: 0.76rem;
+            line-height: 1.3;
+        }}
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 0.7rem;
+            margin: 0.45rem 0 1rem;
+        }}
+        .stat-card {{
+            border: 1px solid rgba(35, 43, 62, 0.10);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 0.8rem 0.85rem;
+            min-width: 0;
+        }}
+        .stat-vn {{
+            color: #313a4b;
+            font-size: 0.72rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 0.1rem;
+        }}
+        .stat-jp {{
+            color: #8b93a5;
+            font-size: 0.62rem;
+            line-height: 1.2;
+            margin-bottom: 0.35rem;
+        }}
+        .stat-value {{
+            color: #232b3e;
+            font-size: 2.1rem;
+            font-weight: 800;
+            line-height: 1;
+        }}
         .save-panel {{
             margin-top: 1rem;
             border-radius: 22px;
@@ -751,10 +795,18 @@ def render_hero() -> None:
             text-decoration: underline;
         }}
         @media (max-width: 820px) {{
+            .block-container {{
+                padding-top: 0.45rem;
+                padding-bottom: 1.4rem;
+                padding-left: 0.8rem;
+                padding-right: 0.8rem;
+            }}
             .hero-card {{
                 flex-direction: column;
-                padding: 1.1rem 1rem;
-                border-radius: 22px;
+                gap: 0.65rem;
+                padding: 0.85rem 0.8rem;
+                border-radius: 18px;
+                margin-bottom: 0.65rem;
             }}
             .hero-title-vn {{
                 font-size: 0.98rem;
@@ -773,12 +825,71 @@ def render_hero() -> None:
             .hero-meta {{
                 width: 100%;
                 flex-basis: auto;
+                padding: 0.8rem 0.85rem 0.25rem;
+                border-radius: 16px;
             }}
             .section-title {{
-                font-size: 1.08rem;
+                font-size: 0.96rem;
+                margin-top: 0.1rem;
             }}
             .section-subtitle {{
+                font-size: 0.7rem;
+                margin-bottom: 0.45rem;
+            }}
+            .field-label-vn {{
                 font-size: 0.78rem;
+                margin-top: 0.02rem;
+            }}
+            .field-label-jp {{
+                font-size: 0.62rem;
+                margin-bottom: 0.16rem;
+            }}
+            .stats-grid {{
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.42rem;
+                margin: 0.2rem 0 0.65rem;
+            }}
+            .stat-card {{
+                padding: 0.45rem 0.5rem;
+                border-radius: 12px;
+            }}
+            .stat-vn {{
+                font-size: 0.5rem;
+            }}
+            .stat-jp {{
+                font-size: 0.46rem;
+                margin-bottom: 0.22rem;
+            }}
+            .stat-value {{
+                font-size: 1.05rem;
+            }}
+            div[data-testid="stTextInput"] input,
+            div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+                min-height: 2.55rem;
+                font-size: 0.9rem;
+                border-radius: 12px;
+            }}
+            div[data-testid="stFormSubmitButton"] > button,
+            div[data-testid="stDownloadButton"] > button {{
+                min-height: 2.6rem;
+                border-radius: 12px;
+                font-size: 0.84rem;
+                padding-top: 0.35rem;
+                padding-bottom: 0.35rem;
+            }}
+            .save-panel {{
+                margin-top: 0.7rem;
+                padding: 0.75rem 0.8rem 0.85rem;
+                border-radius: 16px;
+            }}
+            .save-panel-title {{
+                font-size: 0.9rem;
+            }}
+            .save-panel-sub {{
+                font-size: 0.74rem;
+            }}
+            .support-links {{
+                font-size: 0.82rem;
             }}
         }}
         </style>
@@ -815,26 +926,65 @@ def render_section_title(vn: str, jp: str) -> None:
     )
 
 
+def render_field_label(vn: str, jp: str) -> None:
+    st.markdown(
+        f"""
+        <div class="field-label-vn">{vn}</div>
+        <div class="field-label-jp">{jp}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_stat_cards(stats: dict[str, int]) -> None:
+    items = [
+        ("Tổng phiếu", "総票数", stats["total"]),
+        ("Tham gia", "参加", stats["joined"]),
+        ("Không tham gia", "不参加", stats["not_joined"]),
+        ("Nha Trang", "ニャチャン", stats["nha_trang"]),
+        ("Đà Lạt", "ダラット", stats["da_lat"]),
+    ]
+    cards_html = "".join(
+        f"""
+        <div class="stat-card">
+            <div class="stat-vn">{vn}</div>
+            <div class="stat-jp">{jp}</div>
+            <div class="stat-value">{value}</div>
+        </div>
+        """
+        for vn, jp, value in items
+    )
+    st.markdown(f'<div class="stats-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+
 def render_form() -> None:
     render_section_title("Phiếu khảo sát", "アンケート入力")
 
     with st.form("survey_form", clear_on_submit=True):
-        msnv = st.text_input("MSNV", placeholder="Ví dụ: G06071209")
-        name = st.text_input("Họ tên", placeholder="Ví dụ: Nguyễn Duy Hoà")
-        department = st.selectbox("Bộ phận", DEPARTMENTS, index=3)
-        process = st.text_input("Công đoạn", placeholder="Ví dụ: 56-0")
+        render_field_label("MSNV", "社員番号")
+        msnv = st.text_input("MSNV", label_visibility="collapsed", placeholder="Ví dụ: G06071209")
+        render_field_label("Họ tên", "氏名")
+        name = st.text_input("Họ tên", label_visibility="collapsed", placeholder="Ví dụ: Nguyễn Duy Hoà")
+        render_field_label("Bộ phận", "部門")
+        department = st.selectbox("Bộ phận", DEPARTMENTS, index=3, label_visibility="collapsed")
+        render_field_label("Công đoạn", "工程")
+        process = st.text_input("Công đoạn", label_visibility="collapsed", placeholder="Ví dụ: 56-0")
+        render_field_label("Bạn có tham gia không?", "参加しますか")
         join_value = st.selectbox(
-            "Bạn có tham gia chuyến đi không?",
+            "Bạn có tham gia không?",
             options=["", "Co", "Khong"],
             format_func=lambda value: JOIN_LABELS[value],
+            label_visibility="collapsed",
         )
 
         destination_value = ""
         if join_value == "Co":
+            render_field_label("Chọn 1 địa điểm", "行き先を1つ選択")
             destination_value = st.selectbox(
                 "Chọn 1 địa điểm",
                 options=["", "Nha Trang", "Da Lat"],
                 format_func=lambda value: DESTINATION_LABELS[value],
+                label_visibility="collapsed",
             )
         else:
             st.caption("Nếu chọn Không thì không cần chọn địa điểm. / 不参加の場合は行き先の選択は不要です。")
@@ -955,12 +1105,7 @@ def render_dashboard(records: list[dict[str, str]]) -> None:
     render_section_title("Dashboard tổng quan", "全体ダッシュボード")
     stats = dashboard_metrics(records)
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Tổng phiếu", stats["total"])
-    c2.metric("Tham gia", stats["joined"])
-    c3.metric("Không tham gia", stats["not_joined"])
-    c4.metric("Nha Trang", stats["nha_trang"])
-    c5.metric("Đà Lạt", stats["da_lat"])
+    render_stat_cards(stats)
 
     overview_table = build_overview_table(records)
     overview_chart = build_overview_chart_frame(records)
