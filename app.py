@@ -17,10 +17,12 @@ from excel_export import build_workbook
 try:
     from google.oauth2.service_account import Credentials
     from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseDownload
     from googleapiclient.http import MediaFileUpload
 except ImportError:
     Credentials = None
     build = None
+    MediaIoBaseDownload = None
     MediaFileUpload = None
 
 
@@ -462,6 +464,48 @@ def sync_export_to_google_drive(local_path: Path) -> dict[str, str]:
     return {"status": "created", "url": url}
 
 
+def ensure_local_export_from_google_drive() -> dict[str, str]:
+    export_path = get_export_path()
+    if export_path.exists():
+        return {"status": "local_exists", "path": str(export_path)}
+
+    settings = get_google_drive_settings()
+    if settings["enabled"] != "1":
+        return {"status": "not_configured", "path": str(export_path)}
+
+    service = get_google_drive_service()
+    if service is None or MediaIoBaseDownload is None:
+        return {"status": "missing_library", "path": str(export_path)}
+
+    file_name = export_path.name.replace("'", "\\'")
+    query = (
+        f"name = '{file_name}' and "
+        f"'{settings['folder_id']}' in parents and trashed = false"
+    )
+    existing = (
+        service.files()
+        .list(
+            q=query,
+            spaces="drive",
+            fields="files(id, name)",
+            pageSize=1,
+        )
+        .execute()
+        .get("files", [])
+    )
+    if not existing:
+        return {"status": "drive_file_missing", "path": str(export_path)}
+
+    request = service.files().get_media(fileId=existing[0]["id"])
+    export_path.parent.mkdir(parents=True, exist_ok=True)
+    with export_path.open("wb") as file_obj:
+        downloader = MediaIoBaseDownload(file_obj, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+    return {"status": "downloaded", "path": str(export_path)}
+
+
 def save_export_file(records: list[dict]) -> Path:
     export_dir = get_export_path().parent
     cleanup_old_export_files(export_dir, EXPORT_FILE_NAME)
@@ -495,6 +539,80 @@ def load_rows_from_upload(uploaded_file) -> list[dict]:
     else:
         frame = pd.read_excel(uploaded_file)
     return import_rows_from_frame(frame)
+
+
+def department_summary(records: list[dict]) -> pd.DataFrame:
+    if not records:
+        return pd.DataFrame(columns=["B盻・ph蘯ｭn", "T盻貧g phi蘯ｿu", "Tham gia", "Khﾃｴng tham gia"])
+
+    frame = pd.DataFrame(records)
+    frame["bo_phan"] = frame.get("bo_phan", "").map(normalize_department) if "bo_phan" in frame.columns else ""
+    frame["tham_gia"] = frame.get("tham_gia", "").astype(str).str.strip().str.lower() if "tham_gia" in frame.columns else ""
+    frame["is_join"] = frame["tham_gia"].isin(["co", "cﾃｳ", "yes", "y", "1", "true"])
+
+    grouped = (
+        frame.groupby("bo_phan", dropna=False)
+        .agg(T盻貧g_phi蘯ｿu=("msnv", "count"), Tham_gia=("is_join", "sum"))
+        .reset_index()
+        .rename(columns={"bo_phan": "B盻・ph蘯ｭn", "T盻貧g_phi蘯ｿu": "T盻貧g phi蘯ｿu", "Tham_gia": "Tham gia"})
+    )
+    grouped["Khﾃｴng tham gia"] = grouped["T盻貧g phi蘯ｿu"] - grouped["Tham gia"]
+
+    order_map = {dept: idx for idx, dept in enumerate(DEPARTMENTS)}
+    grouped["_order"] = grouped["B盻・ph蘯ｭn"].map(lambda x: order_map.get(str(x).strip().upper(), 999))
+    return grouped.sort_values(["_order", "B盻・ph蘯ｭn"]).drop(columns=["_order"]).reset_index(drop=True)
+
+
+def destination_summary(records: list[dict]) -> pd.DataFrame:
+    stats = metrics(records)
+    total_join = stats["yes"]
+    rows = [
+        {
+            "H蘯｡ng m盻･c": "T盻貧g tham gia",
+            "S盻・ngﾆｰ盻拱": total_join,
+            "T盻ｷ l盻・": "100%" if total_join else "0%",
+        },
+        {
+            "H蘯｡ng m盻･c": "Khﾃｴng tham gia",
+            "S盻・ngﾆｰ盻拱": stats["no"],
+            "T盻ｷ l盻・": f"{(stats['no'] / stats['total'] * 100):.1f}%" if stats["total"] else "0%",
+        },
+        {
+            "H蘯｡ng m盻･c": "Nha Trang",
+            "S盻・ngﾆｰ盻拱": stats["nha_trang"],
+            "T盻ｷ l盻・": f"{(stats['nha_trang'] / total_join * 100):.1f}%" if total_join else "0%",
+        },
+        {
+            "H蘯｡ng m盻･c": "ﾄ静 L蘯｡t",
+            "S盻・ngﾆｰ盻拱": stats["da_lat"],
+            "T盻ｷ l盻・": f"{(stats['da_lat'] / total_join * 100):.1f}%" if total_join else "0%",
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
+def department_destination_summary(records: list[dict]) -> pd.DataFrame:
+    if not records:
+        return pd.DataFrame(columns=["B盻・ph蘯ｭn", "Tham gia", "Khﾃｴng tham gia", "Nha Trang", "ﾄ静 L蘯｡t"])
+
+    rows: list[dict] = []
+    for department in DEPARTMENTS:
+        dept_records = [
+            item for item in records if normalize_department(item.get("bo_phan")) == department
+        ]
+        stats = metrics(dept_records)
+        if stats["total"] == 0:
+            continue
+        rows.append(
+            {
+                "B盻・ph蘯ｭn": department,
+                "Tham gia": stats["yes"],
+                "Khﾃｴng tham gia": stats["no"],
+                "Nha Trang": stats["nha_trang"],
+                "ﾄ静 L蘯｡t": stats["da_lat"],
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def render_shell() -> None:
@@ -566,6 +684,8 @@ def render_shell() -> None:
     if st.session_state.reset_form_pending:
         reset_form_inputs()
         st.session_state.reset_form_pending = False
+    if "bootstrap_drive_status" not in st.session_state:
+        st.session_state.bootstrap_drive_status = ensure_local_export_from_google_drive().get("status", "")
     st.session_state.records = load_existing_records()
     render_close_warning(st.session_state.dirty_export)
 
@@ -721,6 +841,88 @@ def render_shell() -> None:
             st.bar_chart(detail_chart_frame, width="stretch")
     else:
         st.info("Chưa có dữ liệu để hiển thị dashboard bộ phận.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Bi盻ブ b盻・sung: tham gia vﾃ khﾃｴng tham gia</div>', unsafe_allow_html=True)
+    company_compare = pd.DataFrame(
+        [
+            {"H蘯｡ng m盻･c": "Tham gia", "S盻・ngﾆｰ盻拱": stats["yes"]},
+            {"H蘯｡ng m盻･c": "Khﾃｴng tham gia", "S盻・ngﾆｰ盻拱": stats["no"]},
+            {"H蘯｡ng m盻･c": "Nha Trang", "S盻・ngﾆｰ盻拱": stats["nha_trang"]},
+            {"H蘯｡ng m盻･c": "ﾄ静 L蘯｡t", "S盻・ngﾆｰ盻拱": stats["da_lat"]},
+        ]
+    )
+    st.dataframe(company_compare, width="stretch", hide_index=True)
+    st.bar_chart(company_compare.set_index("H蘯｡ng m盻･c")[["S盻・ngﾆｰ盻拱"]], width="stretch")
+
+    destination_by_department = department_destination_summary(st.session_state.records)
+    if not destination_by_department.empty:
+        st.markdown('<div class="hint">Chi ti盻ｿt theo b盻・ph蘯ｭn: hi盻ハ th盻・c蘯｣ tham gia, khﾃｴng tham gia vﾃ ﾄ黛ｻ蟻 ﾄ訴盻ノ ﾄ妥｣ ch盻肱.</div>', unsafe_allow_html=True)
+        st.dataframe(destination_by_department, width="stretch", hide_index=True)
+        st.bar_chart(
+            destination_by_department.set_index("B盻・ph蘯ｭn")[["Tham gia", "Khﾃｴng tham gia", "Nha Trang", "ﾄ静 L蘯｡t"]],
+            width="stretch",
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Dashboard tong hop de doc</div>', unsafe_allow_html=True)
+    clean_company = pd.DataFrame(
+        [
+            {"Hang muc": "Tong phieu", "So nguoi": stats["total"]},
+            {"Hang muc": "Tong tham gia", "So nguoi": stats["yes"]},
+            {"Hang muc": "Khong tham gia", "So nguoi": stats["no"]},
+            {"Hang muc": "Nha Trang", "So nguoi": stats["nha_trang"]},
+            {"Hang muc": "Da Lat", "So nguoi": stats["da_lat"]},
+        ]
+    )
+    st.caption("Bang tong hop toan cong ty de doi chieu nhanh.")
+    st.dataframe(clean_company, width="stretch", hide_index=True)
+    st.bar_chart(clean_company.set_index("Hang muc")[["So nguoi"]], width="stretch")
+
+    clean_department_rows = []
+    for dept in DEPARTMENTS:
+        dept_items = [
+            item for item in st.session_state.records if normalize_department(item.get("bo_phan")) == dept
+        ]
+        dept_stats = metrics(dept_items)
+        if dept_stats["total"] == 0:
+            continue
+        clean_department_rows.append(
+            {
+                "Bo phan": dept,
+                "Tong phieu": dept_stats["total"],
+                "Tham gia": dept_stats["yes"],
+                "Khong tham gia": dept_stats["no"],
+                "Nha Trang": dept_stats["nha_trang"],
+                "Da Lat": dept_stats["da_lat"],
+            }
+        )
+
+    clean_department = pd.DataFrame(clean_department_rows)
+    if not clean_department.empty:
+        total_detail = pd.DataFrame(
+            [
+                {
+                    "Bo phan": "TONG",
+                    "Tong phieu": int(clean_department["Tong phieu"].sum()),
+                    "Tham gia": int(clean_department["Tham gia"].sum()),
+                    "Khong tham gia": int(clean_department["Khong tham gia"].sum()),
+                    "Nha Trang": int(clean_department["Nha Trang"].sum()),
+                    "Da Lat": int(clean_department["Da Lat"].sum()),
+                }
+            ]
+        )
+        clean_department_view = pd.concat([clean_department, total_detail], ignore_index=True)
+        st.markdown('<div class="section-title">Chi tiet tung bo phan co dong TONG</div>', unsafe_allow_html=True)
+        st.caption("Dong TONG ben duoi phai khop voi so tong quat ben tren.")
+        st.dataframe(clean_department_view, width="stretch", hide_index=True)
+        st.bar_chart(
+            clean_department.set_index("Bo phan")[["Tong phieu", "Tham gia", "Khong tham gia", "Nha Trang", "Da Lat"]],
+            width="stretch",
+        )
     st.markdown("</div>", unsafe_allow_html=True)
 
 
