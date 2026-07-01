@@ -726,6 +726,21 @@ def render_hero() -> None:
             border-color: #dc2626;
             background: linear-gradient(180deg, #ff5a5a, #dc2626);
         }}
+        div[data-testid="stDownloadButton"] > button {{
+            min-height: 3.1rem;
+            border-radius: 16px;
+            border: 2px solid #0f766e;
+            background: linear-gradient(180deg, #18b7a5, #0f766e);
+            color: white;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+        }}
+        div[data-testid="stDownloadButton"] > button:hover {{
+            border-color: #115e59;
+            background: linear-gradient(180deg, #14a394, #115e59);
+            color: white;
+        }}
         .support-links {{
             margin-top: 0.65rem;
             font-size: 0.97rem;
@@ -824,7 +839,7 @@ def render_form() -> None:
         else:
             st.caption("Nếu chọn Không thì không cần chọn địa điểm. / 不参加の場合は行き先の選択は不要です。")
 
-        submitted = st.form_submit_button("LƯU KẾT QUẢ KHẢO SÁT")
+        submitted = st.form_submit_button("LƯU KẾT QUẢ KHẢO SÁT / アンケート結果を保存")
 
     form_dirty = any(
         [
