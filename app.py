@@ -124,6 +124,20 @@ def init_state() -> None:
         st.session_state.save_message = ""
     if "save_message_kind" not in st.session_state:
         st.session_state.save_message_kind = "info"
+    if "form_msnv" not in st.session_state:
+        st.session_state.form_msnv = ""
+    if "form_name" not in st.session_state:
+        st.session_state.form_name = ""
+    if "form_department" not in st.session_state:
+        st.session_state.form_department = "CD"
+    if "form_process" not in st.session_state:
+        st.session_state.form_process = ""
+    if "form_join_value" not in st.session_state:
+        st.session_state.form_join_value = ""
+    if "form_destination_value" not in st.session_state:
+        st.session_state.form_destination_value = ""
+    if "reset_form_after_save" not in st.session_state:
+        st.session_state.reset_form_after_save = False
 
 
 def get_export_path() -> Path:
@@ -603,6 +617,15 @@ def set_save_message(message: str, kind: str = "info") -> None:
     st.session_state.save_message_kind = kind
 
 
+def reset_form_inputs() -> None:
+    st.session_state.form_msnv = ""
+    st.session_state.form_name = ""
+    st.session_state.form_department = "CD"
+    st.session_state.form_process = ""
+    st.session_state.form_join_value = ""
+    st.session_state.form_destination_value = ""
+
+
 def render_hero() -> None:
     st.markdown(
         f"""
@@ -959,37 +982,66 @@ def render_stat_cards(stats: dict[str, int]) -> None:
 
 def render_form() -> None:
     render_section_title("Phiếu khảo sát", "アンケート入力")
+    if st.session_state.reset_form_after_save:
+        reset_form_inputs()
+        st.session_state.reset_form_after_save = False
 
-    with st.form("survey_form", clear_on_submit=True):
-        render_field_label("MSNV", "社員番号")
-        msnv = st.text_input("MSNV", label_visibility="collapsed", placeholder="Ví dụ: G06071209")
-        render_field_label("Họ tên", "氏名")
-        name = st.text_input("Họ tên", label_visibility="collapsed", placeholder="Ví dụ: Nguyễn Duy Hoà")
-        render_field_label("Bộ phận", "部門")
-        department = st.selectbox("Bộ phận", DEPARTMENTS, index=3, label_visibility="collapsed")
-        render_field_label("Công đoạn", "工程")
-        process = st.text_input("Công đoạn", label_visibility="collapsed", placeholder="Ví dụ: 56-0")
-        render_field_label("Bạn có tham gia không?", "参加しますか")
-        join_value = st.selectbox(
-            "Bạn có tham gia không?",
-            options=["", "Co", "Khong"],
-            format_func=lambda value: JOIN_LABELS[value],
+    render_field_label("MSNV", "社員番号")
+    msnv = st.text_input(
+        "MSNV",
+        key="form_msnv",
+        label_visibility="collapsed",
+        placeholder="Ví dụ: G06071209",
+    )
+    render_field_label("Họ tên", "氏名")
+    name = st.text_input(
+        "Họ tên",
+        key="form_name",
+        label_visibility="collapsed",
+        placeholder="Ví dụ: Nguyễn Duy Hoà",
+    )
+    render_field_label("Bộ phận", "部門")
+    department = st.selectbox(
+        "Bộ phận",
+        DEPARTMENTS,
+        key="form_department",
+        label_visibility="collapsed",
+    )
+    render_field_label("Công đoạn", "工程")
+    process = st.text_input(
+        "Công đoạn",
+        key="form_process",
+        label_visibility="collapsed",
+        placeholder="Ví dụ: 56-0",
+    )
+    render_field_label("Bạn có tham gia không?", "参加しますか")
+    join_value = st.selectbox(
+        "Bạn có tham gia không?",
+        options=["", "Co", "Khong"],
+        key="form_join_value",
+        format_func=lambda value: JOIN_LABELS[value],
+        label_visibility="collapsed",
+    )
+
+    destination_value = ""
+    if join_value == "Co":
+        render_field_label("Chọn 1 địa điểm", "行き先を1つ選択")
+        destination_value = st.selectbox(
+            "Chọn 1 địa điểm",
+            options=["", "Nha Trang", "Da Lat"],
+            key="form_destination_value",
+            format_func=lambda value: DESTINATION_LABELS[value],
             label_visibility="collapsed",
         )
+    else:
+        st.session_state.form_destination_value = ""
+        st.caption("Nếu chọn Không thì không cần chọn địa điểm. / 不参加の場合は行き先の選択は不要です。")
 
-        destination_value = ""
-        if join_value == "Co":
-            render_field_label("Chọn 1 địa điểm", "行き先を1つ選択")
-            destination_value = st.selectbox(
-                "Chọn 1 địa điểm",
-                options=["", "Nha Trang", "Da Lat"],
-                format_func=lambda value: DESTINATION_LABELS[value],
-                label_visibility="collapsed",
-            )
-        else:
-            st.caption("Nếu chọn Không thì không cần chọn địa điểm. / 不参加の場合は行き先の選択は不要です。")
-
-        submitted = st.form_submit_button("LƯU KẾT QUẢ KHẢO SÁT / アンケート結果を保存")
+    submitted = st.button(
+        "LƯU KẾT QUẢ KHẢO SÁT / アンケート結果を保存",
+        use_container_width=False,
+        type="primary",
+    )
 
     form_dirty = any(
         [
@@ -1052,6 +1104,8 @@ def render_form() -> None:
         f"Đã lưu phiếu và cập nhật file tổng lúc {st.session_state.last_saved_at}.{drive_text}",
         "success",
     )
+    st.session_state.reset_form_after_save = True
+    st.rerun()
     st.rerun()
 
 
