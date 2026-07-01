@@ -1285,4 +1285,283 @@ def render_shell() -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-render_shell()
+def render_shell_bilingual() -> None:
+    st.set_page_config(
+        page_title="Khảo sát du lịch công ty Meiwa / Meiwa社員旅行アンケート",
+        page_icon="🧳",
+        layout="centered",
+    )
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            padding-top: 1.25rem;
+            padding-bottom: 2rem;
+            max-width: 840px;
+        }
+        .hero {
+            border-radius: 24px;
+            padding: 1.2rem 1.4rem;
+            background: linear-gradient(135deg, #fff6ea 0%, #eef6ff 48%, #f6ecff 100%);
+            border: 1px solid rgba(17, 24, 39, 0.08);
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+            margin-bottom: 1rem;
+        }
+        .hero h1 {
+            margin: 0;
+            font-size: 2rem;
+            line-height: 1.15;
+        }
+        .hero p {
+            margin: 0.35rem 0 0;
+            color: #475569;
+        }
+        .card {
+            background: #ffffff;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 20px;
+            padding: 1rem 1rem 0.85rem;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+            margin-bottom: 1rem;
+        }
+        .save-alert {
+            border: 2px solid #dc2626;
+            background: linear-gradient(135deg, #fff7ed 0%, #fef2f2 100%);
+        }
+        .save-title {
+            color: #b91c1c;
+            font-size: 1.1rem;
+            font-weight: 800;
+            margin-bottom: 0.35rem;
+        }
+        .save-copy {
+            color: #7f1d1d;
+            font-size: 0.95rem;
+            margin-bottom: 0.8rem;
+        }
+        .section-title {
+            font-size: 1.08rem;
+            font-weight: 800;
+            margin: 0 0 0.6rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    app_title = "Khảo sát du lịch công ty Meiwa / Meiwa社員旅行アンケート"
+    join_yes_value = _normalize_join_label("co")
+    join_no_value = _normalize_join_label("khong")
+    dalat_value = _normalize_destination_label("da lat")
+    destination_options = {
+        "Nha Trang / ニャチャン": "Nha Trang",
+        "Đà Lạt / ダラット": dalat_value,
+    }
+
+    def display_join(value: object) -> str:
+        return "Có / 参加する" if _normalize_join_label(value) == join_yes_value else "Không / 不参加"
+
+    def display_destination(value: object) -> str:
+        normalized = _normalize_destination_label(value)
+        if normalized == "Nha Trang":
+            return "Nha Trang / ニャチャン"
+        if normalized == dalat_value:
+            return "Đà Lạt / ダラット"
+        return ""
+
+    init_state()
+    if st.session_state.reset_form_pending:
+        reset_form_inputs()
+        st.session_state.reset_form_pending = False
+    if "bootstrap_drive_status" not in st.session_state:
+        st.session_state.bootstrap_drive_status = ensure_local_export_from_google_drive().get("status", "")
+
+    st.session_state.records = _clean_records(load_existing_records())
+    render_close_warning(st.session_state.dirty_export)
+
+    def mark_dirty() -> None:
+        st.session_state.dirty_export = True
+
+    st.markdown(
+        f"""
+        <div class="hero">
+          <h1>{app_title}</h1>
+          <p>Mở app là nhập ngay. Nếu chọn không tham gia thì phần địa điểm sẽ tự ẩn. / アプリを開いたらすぐ入力できます。不参加を選ぶと行き先は自動で非表示になります。</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    msnv = st.text_input("MSNV / 社員番号", placeholder="Ví dụ / 例: G06071209", key="input_msnv", on_change=mark_dirty)
+    ho_ten = st.text_input("Họ tên / 氏名", placeholder="Ví dụ / 例: Nguyễn Duy Hoà", key="input_ho_ten", on_change=mark_dirty)
+    bo_phan = st.selectbox("Bộ phận / 部門", DEPARTMENTS, key="input_bo_phan", on_change=mark_dirty)
+    cong_doan = st.text_input("Công đoạn / 工程", placeholder="Ví dụ / 例: 56-0 hoặc / または 3-5", key="input_cong_doan", on_change=mark_dirty)
+    tham_gia_label = st.selectbox(
+        "Bạn có tham gia chuyến đi không? / 旅行に参加しますか？",
+        ["Có / 参加する", "Không / 不参加"],
+        index=None,
+        placeholder="Chọn một mục / 1つ選択してください",
+        key="input_tham_gia",
+        on_change=mark_dirty,
+    )
+
+    dia_diem_label = ""
+    if tham_gia_label == "Có / 参加する":
+        dia_diem_label = st.selectbox(
+            "Chọn 1 địa điểm / 行き先を1つ選んでください",
+            list(destination_options.keys()),
+            index=None,
+            placeholder="Chọn địa điểm / 行き先を選択",
+            key="input_dia_diem",
+            on_change=mark_dirty,
+        )
+    else:
+        st.session_state.input_dia_diem = None
+
+    submitted = st.button("LƯU KẾT QUẢ KHẢO SÁT / アンケート結果を保存", width="stretch")
+    if submitted:
+        if not msnv or not ho_ten:
+            st.error("Cần nhập MSNV và Họ tên. / 社員番号と氏名を入力してください。")
+        elif not tham_gia_label:
+            st.error("Cần chọn tham gia hoặc không tham gia. / 参加または不参加を選択してください。")
+        elif tham_gia_label == "Có / 参加する" and not dia_diem_label:
+            st.error("Người tham gia cần chọn địa điểm. / 参加者は行き先を選択してください。")
+        else:
+            stored_join = join_yes_value if tham_gia_label == "Có / 参加する" else join_no_value
+            record = {
+                "msnv": normalize_text(msnv),
+                "ho_ten": normalize_name(ho_ten),
+                "bo_phan": normalize_department(bo_phan),
+                "cong_doan": normalize_text(cong_doan),
+                "tham_gia": stored_join,
+                "dia_diem": destination_options.get(dia_diem_label, "") if stored_join == join_yes_value else "",
+            }
+            current_records = _clean_records(load_existing_records())
+            st.session_state.records = current_records
+            upsert_record(record)
+            st.session_state.records = _clean_records(st.session_state.records)
+            export_path = save_export_file(st.session_state.records)
+            drive_result = {"status": "not_configured", "url": ""}
+            try:
+                drive_result = sync_export_to_google_drive(export_path)
+            except Exception as exc:
+                drive_result = {"status": f"error: {exc}", "url": ""}
+            st.session_state.last_saved_path = str(export_path)
+            st.session_state.last_saved_at = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            st.session_state.last_drive_url = drive_result.get("url", "")
+            st.session_state.dirty_export = False
+            st.session_state.reset_form_pending = True
+            if drive_result["status"] in {"created", "updated"}:
+                st.success(f"Đã lưu khảo sát và cập nhật file tổng lúc {st.session_state.last_saved_at}. / {st.session_state.last_saved_at} に集計ファイルを更新しました。")
+            elif drive_result["status"] == "not_configured":
+                st.success(f"Đã lưu khảo sát vào file tổng lúc {st.session_state.last_saved_at}. / {st.session_state.last_saved_at} に集計ファイルへ保存しました。")
+            else:
+                st.warning(f"Đã lưu file tổng, nhưng Google Drive chưa cập nhật: {drive_result['status']} / Google Drive の更新は未完了です。")
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="card save-alert">', unsafe_allow_html=True)
+    st.markdown('<div class="save-title">TỰ ĐỘNG LƯU FILE TỔNG / 集計ファイル自動保存</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="save-copy">Mỗi lần bấm nút lưu, app sẽ cập nhật ngay vào 1 file tổng duy nhất. / 保存ボタンを押すたびに、1つの集計ファイルへ自動反映されます。</div>',
+        unsafe_allow_html=True,
+    )
+    excel_bytes = build_export_bytes(st.session_state.records)
+    st.download_button(
+        "TẢI FILE TỔNG / 集計ファイルをダウンロード",
+        data=excel_bytes,
+        file_name=EXPORT_FILE_NAME,
+        mime=EXCEL_MIME_TYPE,
+        width="stretch",
+    )
+    drive_settings = get_google_drive_settings()
+    drive_url = st.session_state.last_drive_url or drive_settings["shared_url"]
+    if st.session_state.last_saved_path:
+        st.caption(f"File tổng mới nhất / 最新の集計ファイル: `{st.session_state.last_saved_path}`")
+    if drive_url:
+        st.markdown(f"[MỞ FILE TỔNG TRÊN GOOGLE DRIVE / Google Driveで集計ファイルを開く]({drive_url})")
+    else:
+        st.caption("Chưa cấu hình Google Drive. App vẫn lưu file tổng trong máy. / Google Drive は未設定ですが、PC内には保存されます。")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Danh sách đã nhập / 入力済み一覧</div>', unsafe_allow_html=True)
+    cleaned_records = _clean_records(st.session_state.records)
+    if cleaned_records:
+        display_rows = []
+        for item in cleaned_records:
+            display_rows.append(
+                {
+                    "MSNV / 社員番号": item.get("msnv", ""),
+                    "Họ tên / 氏名": item.get("ho_ten", ""),
+                    "Bộ phận / 部門": item.get("bo_phan", ""),
+                    "Công đoạn / 工程": item.get("cong_doan", ""),
+                    "Tham gia / 参加": display_join(item.get("tham_gia")),
+                    "Địa điểm / 行き先": display_destination(item.get("dia_diem")),
+                }
+            )
+        st.dataframe(pd.DataFrame(display_rows), width="stretch", hide_index=True)
+    else:
+        st.info("Chưa có dữ liệu khảo sát. / アンケートデータはまだありません。")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    stats = _dashboard_metrics(st.session_state.records)
+    company_view = pd.DataFrame(
+        [
+            {"Hạng mục / 項目": "Tổng phiếu / 総回答数", "Số lượng / 人数": stats["total"], "Tỷ lệ / 比率": "100%" if stats["total"] else "0%"},
+            {"Hạng mục / 項目": "Tham gia / 参加", "Số lượng / 人数": stats["yes"], "Tỷ lệ / 比率": f"{(stats['yes'] / stats['total'] * 100):.1f}%" if stats["total"] else "0%"},
+            {"Hạng mục / 項目": "Không tham gia / 不参加", "Số lượng / 人数": stats["no"], "Tỷ lệ / 比率": f"{(stats['no'] / stats['total'] * 100):.1f}%" if stats["total"] else "0%"},
+            {"Hạng mục / 項目": "Nha Trang / ニャチャン", "Số lượng / 人数": stats["nha_trang"], "Tỷ lệ / 比率": f"{(stats['nha_trang'] / stats['yes'] * 100):.1f}%" if stats["yes"] else "0%"},
+            {"Hạng mục / 項目": "Đà Lạt / ダラット", "Số lượng / 人数": stats["da_lat"], "Tỷ lệ / 比率": f"{(stats['da_lat'] / stats['yes'] * 100):.1f}%" if stats["yes"] else "0%"},
+        ]
+    )
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Biểu đồ tổng quan toàn công ty / 全社集計グラフ</div>', unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Tổng phiếu / 総回答数", stats["total"])
+    col2.metric("Tham gia / 参加", stats["yes"], f"{(stats['yes'] / stats['total'] * 100):.1f}%" if stats["total"] else "0%")
+    col3.metric("Không tham gia / 不参加", stats["no"], f"{(stats['no'] / stats['total'] * 100):.1f}%" if stats["total"] else "0%")
+    col4.metric("Địa điểm đã chọn / 行き先選択数", stats["nha_trang"] + stats["da_lat"])
+    st.caption("Bảng này là số tổng của toàn công ty. Phần chi tiết theo bộ phận bên dưới phải khớp với số này. / この表は全社合計です。下の部門別合計と一致する必要があります。")
+    st.dataframe(company_view, width="stretch", hide_index=True)
+    st.bar_chart(company_view.set_index("Hạng mục / 項目")[["Số lượng / 人数"]], width="stretch")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    department_frame = _department_summary_frame(st.session_state.records)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Tổng hợp theo bộ phận / 部門別集計</div>', unsafe_allow_html=True)
+    if not department_frame.empty:
+        department_view = department_frame.copy()
+        department_view.columns = [
+            "Bộ phận / 部門",
+            "Tổng phiếu / 総回答数",
+            "Tham gia / 参加",
+            "Không tham gia / 不参加",
+            "Nha Trang / ニャチャン",
+            "Đà Lạt / ダラット",
+        ]
+        department_view["Bộ phận / 部門"] = department_view["Bộ phận / 部門"].replace({"T盻年G": "TỔNG / 合計"})
+        st.caption("Mỗi dòng là tổng của một bộ phận. Dòng TỔNG phải khớp với bảng tổng quan toàn công ty. / 各行は各部門の合計です。合計行は全社集計と一致する必要があります。")
+        st.dataframe(department_view, width="stretch", hide_index=True)
+        chart_source = department_view[department_view["Bộ phận / 部門"] != "TỔNG / 合計"].set_index("Bộ phận / 部門")
+        st.bar_chart(chart_source[["Tổng phiếu / 総回答数", "Tham gia / 参加", "Không tham gia / 不参加"]], width="stretch")
+    else:
+        st.info("Chưa có dữ liệu theo bộ phận. / 部門別データはまだありません。")
+        department_view = pd.DataFrame()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Biểu đồ chi tiết từng bộ phận / 部門別詳細グラフ</div>', unsafe_allow_html=True)
+    if not department_view.empty:
+        st.caption("Biểu đồ này cho biết từng bộ phận có bao nhiêu người tham gia, không tham gia, chọn Nha Trang và chọn Đà Lạt. / 各部門の参加人数、不参加人数、ニャチャン選択数、ダラット選択数を表示します。")
+        st.dataframe(department_view, width="stretch", hide_index=True)
+        detail_chart = department_view[department_view["Bộ phận / 部門"] != "TỔNG / 合計"].set_index("Bộ phận / 部門")
+        st.bar_chart(detail_chart[["Tham gia / 参加", "Không tham gia / 不参加", "Nha Trang / ニャチャン", "Đà Lạt / ダラット"]], width="stretch")
+    else:
+        st.info("Chưa có dữ liệu chi tiết từng bộ phận. / 部門別詳細データはまだありません。")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+render_shell_bilingual()
